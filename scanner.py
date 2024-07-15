@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import img2pdf
 from PIL import Image
 import os
 
@@ -18,9 +17,23 @@ def writeCroppedImage(filepath, img, x, y, w, h, grayscale=False):
     cv2.imwrite(filepath, cropped)
 
 
-def createPdf(mode):
-    print('TODO')
+def createPdf(filepath, filename, mode):
+    images = []
+    for i in os.listdir(filepath):
+        if i.endswith('.jpg'):
+            images.append(Image.open(os.path.join(filepath, i)))
 
+    images[0].save(
+        filename + '.pdf', "PDF" ,resolution=100.0, save_all=True, append_images=images[1:]
+    )    
+
+
+
+# images = [i for i in os.listdir(filepath) if i.endswith(".jpg")]
+    # pdfBytes = img2pdf.convert(images)
+    #
+    # with open(filename + '.pdf', 'wb') as file:
+    #     file.write(pdfBytes)
 
 def inputMenuValidation(menu, numOptions):
     print(menu)
@@ -46,11 +59,11 @@ def inputScannerSettings():
     else:
         grayscale = False
 
-    print('Input filename:')
+    print('Input pdf filename:')
 
     filename = input('> ')
-    if filename[-4:] != '.pdf':
-        filename += '.pdf'
+    if filename[-4:] == '.pdf':
+        filename = filename[:-4]
 
     return mode, grayscale, filename
 
@@ -72,11 +85,9 @@ def contour(frame):
 def main():
     mode, grayscale, filename = inputScannerSettings()
 
-    imagesPath = os.getcwd() + '/' + filename[:-4]
+    imagesPath = os.path.join(os.getcwd(), filename + 'Images')
     if os.path.exists(imagesPath) != True:
         os.mkdir(imagesPath)
-
-
 
     print("Press 'spacebar' to take picture, press 'q' to quit")
 
@@ -112,6 +123,9 @@ def main():
 
     capture.release()
     cv2.destroyAllWindows()
-    createPdf(mode)
+    createPdf(imagesPath, filename, mode)
+
+    # if imagesTaken > 0:
+    #     createPdf(imagesPath, filename, mode)
 
 main()
