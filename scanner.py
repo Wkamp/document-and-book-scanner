@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
-from PIL import Image
 import os
+from PIL import Image
+from math import ceil
 
 def displayFrame(frame, reduceSize=1):
     if reduceSize <= 0:
@@ -17,23 +18,14 @@ def writeCroppedImage(filepath, img, x, y, w, h, grayscale=False):
     cv2.imwrite(filepath, cropped)
 
 
-def createPdf(filepath, filename, mode):
+def createPdf(filepath, filename, numPages):
     images = []
-    for i in os.listdir(filepath):
-        if i.endswith('.jpg'):
-            images.append(Image.open(os.path.join(filepath, i)))
+    for i in range(1, numPages + 1):
+        images.append(Image.open(os.path.join(filepath, f'p{i}.jpg')))
 
     images[0].save(
         filename + '.pdf', "PDF" ,resolution=100.0, save_all=True, append_images=images[1:]
     )    
-
-
-
-# images = [i for i in os.listdir(filepath) if i.endswith(".jpg")]
-    # pdfBytes = img2pdf.convert(images)
-    #
-    # with open(filename + '.pdf', 'wb') as file:
-    #     file.write(pdfBytes)
 
 def inputMenuValidation(menu, numOptions):
     print(menu)
@@ -47,11 +39,31 @@ def inputMenuValidation(menu, numOptions):
     return int(user)
 
 def inputScannerSettings():
+    pageDelta = 0 # used only when book mode chosen
+
     mode = inputMenuValidation('Enter the number of an option:\n\t1. Document Mode\n\t2. Book Mode', 2)
     if mode == 1:
         mode = 'document'
     elif mode == 2:
         mode = 'book'
+
+        print('\nEnter first page number: ')
+        first = input('> ')
+        while first.isdigit() == False:
+            print('ERROR: Invalid Input\n')
+            print('Enter first page number: ')
+            first = input('> ')
+
+        print('\nEnter last page number: ')
+        last = input('> ')
+        while last.isdigit() == False:
+            print('ERROR: Invalid Input\n')
+            print('Enter last page number: ')
+            first = input('> ')
+
+        last = int(last)
+        first = int(first)
+        pageDelta = abs(last - first)
 
     grayscale = inputMenuValidation('Enter the number of an option:\n\t1. Color \n\t2. Grayscale', 2)
     if grayscale == 2:
@@ -65,7 +77,7 @@ def inputScannerSettings():
     if filename[-4:] == '.pdf':
         filename = filename[:-4]
 
-    return mode, grayscale, filename
+    return mode, pageDelta, grayscale, filename
 
 def contour(frame):
     lower = np.array([135, 135, 135])
@@ -79,20 +91,34 @@ def contour(frame):
     cnt = max(contours, key = cv2.contourArea)
     x,y,w,h = cv2.boundingRect(cnt)
 
-
     return frame, x, y, w, h
 
 def main():
-    mode, grayscale, filename = inputScannerSettings()
+    mode, pageDelta, grayscale, filename = inputScannerSettings()
+    rightSideTaken = False
+    numRightPages = ceil(pageDelta / 2)
+    if pageDelta % 2 == 0:
+        numRightPages += 1
 
     imagesPath = os.path.join(os.getcwd(), filename + 'Images')
     if os.path.exists(imagesPath) != True:
         os.mkdir(imagesPath)
-
-    print("Press 'spacebar' to take picture, press 'q' to quit")
+    
+    if mode == 'document':
+        print('\n*** Document Mode Instructions ***')
+        print("Press 'spacebar' to take a picture, press 'q' to exit\n")
+    else:
+        print('\n*** Book Mode Instructions ***')
+        print("Press 'spacebar' to take a picture, press 'q' to exit early\n")
+        print('1. Take a picture of every right-side page')
+        print('2. Take a picture of every left-side page')
 
     capture = cv2.VideoCapture(0)
+    
     imagesTaken = 0
+    pageNum = 0 
+    if mode == 'book' and pageDelta % 2 == 0:
+        pageNum = -1
 
     while capture.isOpened():
         ret, frame = capture.read()
@@ -110,22 +136,38 @@ def main():
             displayFrame(frame)
 
         waitKey = cv2.waitKey(1)
+ 
         if waitKey % 256 == 113: # exits capture on 'q' key pressed
             break
 
         if waitKey % 256 == 32: # takes picture on 'spacebar' key pressed
             if contourFound == True:
-                imagesTaken += 1 
-                print(f'Page {imagesTaken} taken')
-                writeCroppedImage(os.path.join(imagesPath, f'p{imagesTaken}.jpg'), frame, x, y, w, h, grayscale)
+                if mode != 'book':
+                    pageNum += 1
+                else:
+                    pageNum += 2
+
+                imagesTaken += 1
+                print(f'Page {pageNum} taken')
+                writeCroppedImage(os.path.join(imagesPath, f'p{pageNum}.jpg'), frame, x, y, w, h, grayscale)
             else:
                 print('WRITE FAILED: No Contours Found!')
+        
+        if mode == 'book' and rightSideTaken == False and numRightPages == imagesTaken:
+            rightSideTaken = True
+            if pageDelta % 2 != 0:
+                pageNum = -1
+            else:
+                pageNum = 0
+            print('\n*** Right Pages Recorded ***\n')
+
+        elif mode == 'book' and pageDelta + 1 == imagesTaken:
+            print('\n*** Left Pages Recorded ***\n')
+            break
 
     capture.release()
     cv2.destroyAllWindows()
-    createPdf(imagesPath, filename, mode)
-
-    # if imagesTaken > 0:
-    #     createPdf(imagesPath, filename, mode)
-
+   
+    print("Creating pdf...")
+    createPdf(imagesPath, filename, imagesTaken)
 main()
