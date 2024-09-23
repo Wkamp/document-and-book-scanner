@@ -41,6 +41,13 @@ def inputMenuValidation(menu, numOptions):
 def inputScannerSettings():
     pageDelta = 0 # used only when book mode chosen
 
+    print('Enter camera index:\n(input 0 if you have only one camera connected to your pc)\n')
+
+    camIndex = input('> ')
+    while (camIndex.isdigit() == False):
+        print("ERROR: input not a number")
+        camIndex = input('> ')
+
     mode = inputMenuValidation('Enter the number of an option:\n\t1. Document Mode\n\t2. Book Mode', 2)
     if mode == 1:
         mode = 'document'
@@ -71,13 +78,13 @@ def inputScannerSettings():
     else:
         grayscale = False
 
-    print('Input pdf filename:')
+    print('Enter output pdf filename:')
 
     filename = input('> ')
     if filename[-4:] == '.pdf':
         filename = filename[:-4]
 
-    return mode, pageDelta, grayscale, filename
+    return mode, pageDelta, grayscale, filename, camIndex
 
 def contour(frame):
     lower = np.array([135, 135, 135])
@@ -94,7 +101,7 @@ def contour(frame):
     return frame, x, y, w, h
 
 def main():
-    mode, pageDelta, grayscale, filename = inputScannerSettings()
+    mode, pageDelta, grayscale, filename, camIndex = inputScannerSettings()
     rightSideTaken = False
     numRightPages = ceil(pageDelta / 2)
     if pageDelta % 2 == 0:
@@ -113,7 +120,7 @@ def main():
         print('1. Take a picture of every right-side page')
         print('2. Take a picture of every left-side page')
 
-    capture = cv2.VideoCapture(0)
+    capture = cv2.VideoCapture(int(camIndex))
     
     imagesTaken = 0
     pageNum = 0 
